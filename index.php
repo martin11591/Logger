@@ -14,7 +14,6 @@ class Debug {
     // E - Getting properties
     // F - Setting properties
     // G - Debug info
-    public const NONE = 0;
     public const CRITICAL = 0b0000001;
     public const WARNING = 0b0000010;
     public const CONSTRUCTORS = 0b0000100;
@@ -24,19 +23,34 @@ class Debug {
     public const DEBUG_INFO = 0b1000000;
     public static $mode = self::CRITICAL | self::WARNING | self::CONSTRUCTORS | self::CALLING_METHODS | self::GETTING_PROPERTIES | self::SETTING_PROPERTIES | self::DEBUG_INFO;
 
-    public static function getTypesNames($bits = 0b1000000) {
+    public static function getTypesNames($bits = 0b1000000)
+    {
         $arr = [];
-        if ($bits & self::CRITICAL) array_push($arr, 'Debug::CRITICAL');
-        if ($bits & self::WARNING) array_push($arr, 'Debug::WARNING');
-        if ($bits & self::CONSTRUCTORS) array_push($arr, 'Debug::CONSTRUCTORS');
-        if ($bits & self::CALLING_METHODS) array_push($arr, 'Debug::CALLING_METHODS');
-        if ($bits & self::GETTING_PROPERTIES) array_push($arr, 'Debug::GETTING_PROPERTIES');
-        if ($bits & self::SETTING_PROPERTIES) array_push($arr, 'Debug::SETTING_PROPERTIES');
-        if ($bits & self::DEBUG_INFO) array_push($arr, 'Debug::DEBUG_INFO');
+        if ($bits & self::CRITICAL) {
+            array_push($arr, 'CRITICAL');
+        }
+        if ($bits & self::WARNING) {
+            array_push($arr, 'WARNING');
+        }
+        if ($bits & self::CONSTRUCTORS) {
+            array_push($arr, 'CONSTRUCTORS');
+        }
+        if ($bits & self::CALLING_METHODS) {
+            array_push($arr, 'CALLING_METHODS');
+        }
+        if ($bits & self::GETTING_PROPERTIES) {
+            array_push($arr, 'GETTING_PROPERTIES');
+        }
+        if ($bits & self::SETTING_PROPERTIES) {
+            array_push($arr, 'SETTING_PROPERTIES');
+        }
+        if ($bits & self::DEBUG_INFO) {
+            array_push($arr, 'DEBUG_INFO');
+        }
         return implode(' | ', $arr);
     }
 
-    public static function testTypes($bits = 0b1000000) {
+    public static function testTypes($bits = self::DEBUG_INFO) {
         return $bits & self::$mode;
     }
 }
@@ -58,9 +72,29 @@ class Log {
     }
 
     public static function entry($type = Debug::DEBUG_INFO, $msg = '') {
+        $eol = "<br/>" . PHP_EOL;
+        $types = Debug::getTypesNames($type);
         if (Debug::testTypes($type) > 0) {
-            echo Debug::getTypesNames($type) . " : LOG" . PHP_EOL;
+            if (gettype(self::$handler) === "resource") {
+                self::entryToFile($type, $msg, self::$handler);
+            }
+            if (self::$handler === NULL) {
+                echo "{$eol}{$types} : {$msg}";
+            }
         }
+    }
+
+    public static function entryToFile($type = Debug::DEBUG_INFO, $msg = '', $handler = NULL) {
+        if ($handler === NULL && gettype(self::$handler) !== 'resource') {
+            return false;
+        }
+        if ($handler !== self::$handler && $handler === NULL) {
+            $handler = self::$handler;
+        }
+        $eol = PHP_EOL;
+        $types = Debug::getTypesNames($type);
+        fwrite($handler, "{$eol}{$types} : {$msg}");
+        return true;
     }
 }
 
@@ -86,10 +120,12 @@ class Path {
         $this->pathArray = explode('/', $path);
         $this->maxLevel = $this->currentLevel = count($this->pathArray) - 1;
         $this->path = $path;
-        if ($path !== '' && $create === true) {
-            $this->createDir($this);
-        } else {
-            throw new PathException('Path "' . $path . '" not exists and creating directories are not allowed');
+        if ($path !== '') {
+            if ($create === true) {
+                $this->createDir($this);
+            } else {
+                throw new PathException("Cannot create path \"{$path}\" - creating folders not allowed by parameter");
+            }
         }
         return $this;
     }
@@ -106,6 +142,10 @@ class Path {
         return $this->maxLevel;
     }
 
+    public function exist() {
+        return file_exists($this->path);
+    }
+
     public static function createDir(Path $path) {
         try {
             mkdir($path->getPath(), 0777, true);
@@ -116,9 +156,9 @@ class Path {
 
     public static function clean($path) {
         $path = preg_replace('<(\\\\|/)+>', '/', $path);
-        return implode('/', array_map(function($arg) {
+        return substr(implode('/', array_map(function($arg) {
             return File::clean($arg);
-        }, explode('/', $path)));
+        }, explode('/', $path))),1);
     }
 }
 
@@ -144,15 +184,30 @@ class File {
 
     public function setFileName($fileName, $create) {
         $this->fileName = self::clean($fileName);
-        if (!file_exists($fileName) && $fileName !== '' && $create === true) {
-            throw new FileException('File "' . $fileName . '" not exists and creating files are not allowed');
-        }
-        try {
-            $this->handler = fopen($this->getFullRelativePath(), $this->mode);
-        } catch(Exception $e) {
-            throw new FileException($e);
+        if ($fileName !== '') {
+            if (file_exists($fileName) === false && $create === false) {
+                throw new FileException("File \"{$fileName}\" not exist and cannot be created by parameter");
+            } else {
+                $exist = $this->exist() === false ? "created" : "opened";
+                $this->handler = fopen($this->getFullRelativePath(), $this->mode);
+                if ($this->handler === false) {
+                    throw new FileException("Error opening file \"{$fileName}\"");
+                }
+                Log::entry(Debug::DEBUG_INFO, "File \"{$fileName}\" {$exist}");
+            }
+        } else {
+            throw new FileException("Filename not specified");
         }
         return $this;
+    }
+
+    public function getHandler()
+    {
+        return $this->handler;
+    }
+
+    public function exist() {
+        return file_exists($this->getFullRelativePath());
     }
 
     public function getFullRelativePath() {
@@ -165,21 +220,17 @@ class File {
 }
 
 set_error_handler(function($errno, $errstr, $errfile, $errline) {
-   throw new ErrorException("Error " . $errno . "<br/>" . $errstr . " in file " . $errfile . " in line " . $errline);
+   throw new ErrorException("Error " . $errno . "<br/>" . PHP_EOL . $errstr . " in file " . $errfile . " in line " . $errline);
 }, E_ALL);
 
-echo "<br/>" . Path::clean("fdsfds/fdfds");
-echo "<br/>" . Debug::getTypesNames(Debug::$mode);
-echo "<br/>DEBUG_WARNING in mode: " . Debug::getTypesNames(Debug::testTypes(Debug::WARNING | Debug::DEBUG_INFO));
-Debug::$mode = 0b1010101;
-echo "<br/>DEBUG_WARNING in mode: " . Debug::getTypesNames(Debug::testTypes(Debug::WARNING));
-if (Debug::testTypes(Debug::WARNING) === 0) echo "<br/>TRUE";
-echo "<br/>" . Debug::getTypesNames(Debug::$mode);
-echo "<br/>" . decbin(Debug::$mode & (Debug::CONSTRUCTORS | Debug::WARNING));
-echo "<br/>" . decbin(Debug::CONSTRUCTORS | Debug::WARNING);
-die();
-
 $file = new File("log.txt", true);
+echo gettype($file->getHandler());
+Log::$handler = $file->getHandler();
+
+Log::entry(Debug::DEBUG_INFO, "TEST");
+Log::entryToFile(Debug::DEBUG_INFO, "File TEST", $file->getHandler());
+
+die();
 
 //echo $path->getEnteredPath(). '<br/>' . $path->getPath() . '<br/>' . $path->getMaxLevel();
 //echo "<br/>".$file->getFullRelativePath();
