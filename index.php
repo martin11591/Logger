@@ -23,7 +23,13 @@ class Debug {
     public const DEBUG_INFO = 0b1000000;
     public static $mode = self::CRITICAL | self::WARNING | self::CONSTRUCTORS | self::CALLING_METHODS | self::GETTING_PROPERTIES | self::SETTING_PROPERTIES | self::DEBUG_INFO;
 
-    public static function getTypesNames($bits = 0b1000000)
+    /**
+     * Return joined types as string
+     *
+     * @param int $bits
+     * @return string
+     */
+    public static function getTypesNames($bits = self::DEBUG_INFO)
     {
         $arr = [];
         if ($bits & self::CRITICAL) {
@@ -50,6 +56,12 @@ class Debug {
         return implode(' | ', $arr);
     }
 
+    /**
+     * Test passed type with current mode
+     *
+     * @param int $bits
+     * @return boolean
+     */
     public static function testTypes($bits = self::DEBUG_INFO) {
         return $bits & self::$mode;
     }
@@ -61,16 +73,38 @@ class Log {
     public static $getMilliSeconds = false;
     public static $asMicroSeconds = false;
     public static $handler = NULL;
+    private static $internalLog = [];
 
+    /**
+     * Returns time format string based on current settings (date, milliseconds and microseconds)
+     *
+     * @return string
+     */
     public static function getFormat() {
         return (self::$date === true ? "Y.m.d " : "") . "H:i:s" . (self::$getMilliSeconds === true ? "." . (self::$asMicroSeconds === false ? "v" : "u") : "");
     }
 
+    /**
+     * Returns current time formated by @getFormat() method
+     *
+     * @return string
+     */
     public static function getCurrentTime() {
         $t = new DateTime('now');
         return $t->format(self::getFormat());
     }
 
+    /**
+     * Make new entry
+     *
+     * Current settings define how this will behave
+     * It checks Log::$handler - if is NULL then it writes on screen
+     *                           if is file handler then it writes to file
+     *                           if is database handler then it store to database
+     *
+     * @param int $type
+     * @param string $msg
+     */
     public static function entry($type = Debug::DEBUG_INFO, $msg = '') {
         $eol = "<br/>" . PHP_EOL;
         $types = Debug::getTypesNames($type);
@@ -84,6 +118,19 @@ class Log {
         }
     }
 
+    public static function getInternalLog($separator = '<br/>' . PHP_EOL) {
+        return implode($separator, self::$internalLog);
+    }
+
+    public static function clearInternalLog() {
+        self::$internalLog = [];
+    }
+
+    public static function entryToInternal($type = Debug::DEBUG_INFO, $msg = '') {
+        $types = Debug::getTypesNames($type);
+        array_push(self::$internalLog, "{$types} : {$msg}");
+    }
+
     public static function entryToFile($type = Debug::DEBUG_INFO, $msg = '', $handler = NULL) {
         if ($handler === NULL && gettype(self::$handler) !== 'resource') {
             return false;
@@ -94,7 +141,6 @@ class Log {
         $eol = PHP_EOL;
         $types = Debug::getTypesNames($type);
         fwrite($handler, "{$eol}{$types} : {$msg}");
-        return true;
     }
 }
 
@@ -193,7 +239,7 @@ class File {
                 if ($this->handler === false) {
                     throw new FileException("Error opening file \"{$fileName}\"");
                 }
-                Log::entry(Debug::DEBUG_INFO, "File \"{$fileName}\" {$exist}");
+                Log::entryToInternal(Debug::DEBUG_INFO, "File \"{$fileName}\" {$exist}");
             }
         } else {
             throw new FileException("Filename not specified");
@@ -224,13 +270,15 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 }, E_ALL);
 
 $file = new File("log.txt", true);
-echo gettype($file->getHandler());
-Log::$handler = $file->getHandler();
 
-Log::entry(Debug::DEBUG_INFO, "TEST");
-Log::entryToFile(Debug::DEBUG_INFO, "File TEST", $file->getHandler());
+Log::entryToInternal(Debug::DEBUG_INFO, "TEST");
 
-die();
+for ($i = 0; $i < 10; $i++) {
+    Log::entryToInternal(Debug::DEBUG_INFO, "Message {$i}");
+}
 
-//echo $path->getEnteredPath(). '<br/>' . $path->getPath() . '<br/>' . $path->getMaxLevel();
-//echo "<br/>".$file->getFullRelativePath();
+for ($i = 0; $i < 10; $i++) {
+    Log::entryToInternal(Debug::DEBUG_INFO, "Message {$i}");
+}
+
+echo Log::getInternalLog();
