@@ -20,8 +20,8 @@ class Debug {
     public const CALLING_METHODS = 0b0001000;
     public const GETTING_PROPERTIES = 0b0010000;
     public const SETTING_PROPERTIES = 0b0100000;
-    public const DEBUG_INFO = 0b1000000;
-    public static $mode = self::CRITICAL | self::WARNING | self::CONSTRUCTORS | self::CALLING_METHODS | self::GETTING_PROPERTIES | self::SETTING_PROPERTIES | self::DEBUG_INFO;
+    public const INFO = 0b1000000;
+    public static $mode = self::CRITICAL | self::WARNING | self::CONSTRUCTORS | self::CALLING_METHODS | self::GETTING_PROPERTIES | self::SETTING_PROPERTIES | self::INFO;
 
     /**
      * Return joined types as string
@@ -29,7 +29,7 @@ class Debug {
      * @param int $bits
      * @return string
      */
-    public static function getTypesNames($bits = self::DEBUG_INFO)
+    public static function getTypesNames($bits = self::INFO)
     {
         $arr = [];
         if ($bits & self::CRITICAL) {
@@ -50,8 +50,8 @@ class Debug {
         if ($bits & self::SETTING_PROPERTIES) {
             array_push($arr, 'SETTING_PROPERTIES');
         }
-        if ($bits & self::DEBUG_INFO) {
-            array_push($arr, 'DEBUG_INFO');
+        if ($bits & self::INFO) {
+            array_push($arr, 'INFO');
         }
         return implode(' | ', $arr);
     }
@@ -62,7 +62,7 @@ class Debug {
      * @param int $bits
      * @return boolean
      */
-    public static function testTypes($bits = self::DEBUG_INFO) {
+    public static function testTypes($bits = self::INFO) {
         return $bits & self::$mode;
     }
 }
@@ -94,6 +94,14 @@ class Log {
         return $t->format(self::getFormat());
     }
 
+    public static function getInternalLog($separator = '<br/>' . PHP_EOL) {
+        return implode($separator, self::$internalLog);
+    }
+
+    public static function clearAllInternalLog() {
+        self::$internalLog = [];
+    }
+
     /**
      * Make new entry
      *
@@ -105,7 +113,7 @@ class Log {
      * @param int $type
      * @param string $msg
      */
-    public static function entry($type = Debug::DEBUG_INFO, $msg = '') {
+    public static function entry($type = Debug::INFO, $msg = '') {
         $eol = "<br/>" . PHP_EOL;
         $types = Debug::getTypesNames($type);
         if (Debug::testTypes($type) > 0) {
@@ -118,20 +126,12 @@ class Log {
         }
     }
 
-    public static function getInternalLog($separator = '<br/>' . PHP_EOL) {
-        return implode($separator, self::$internalLog);
-    }
-
-    public static function clearInternalLog() {
-        self::$internalLog = [];
-    }
-
-    public static function entryToInternal($type = Debug::DEBUG_INFO, $msg = '') {
+    public static function entryToInternal($type = Debug::INFO, $msg = '') {
         $types = Debug::getTypesNames($type);
         array_push(self::$internalLog, "{$types} : {$msg}");
     }
 
-    public static function entryToFile($type = Debug::DEBUG_INFO, $msg = '', $handler = NULL) {
+    public static function entryToFile($type = Debug::INFO, $msg = '', $handler = NULL) {
         if ($handler === NULL && gettype(self::$handler) !== 'resource') {
             return false;
         }
@@ -239,7 +239,7 @@ class File {
                 if ($this->handler === false) {
                     throw new FileException("Error opening file \"{$fileName}\"");
                 }
-                Log::entryToInternal(Debug::DEBUG_INFO, "File \"{$fileName}\" {$exist}");
+                Log::entryToInternal(Debug::INFO, "File \"{$fileName}\" {$exist}");
             }
         } else {
             throw new FileException("Filename not specified");
@@ -271,14 +271,14 @@ set_error_handler(function($errno, $errstr, $errfile, $errline) {
 
 $file = new File("log.txt", true);
 
-Log::entryToInternal(Debug::DEBUG_INFO, "TEST");
+Log::entryToInternal(Debug::INFO | Debug::WARNING, "TEST");
 
 for ($i = 0; $i < 10; $i++) {
-    Log::entryToInternal(Debug::DEBUG_INFO, "Message {$i}");
+    Log::entryToInternal(Debug::INFO, "Message {$i}");
 }
 
 for ($i = 0; $i < 10; $i++) {
-    Log::entryToInternal(Debug::DEBUG_INFO, "Message {$i}");
+    Log::entryToInternal(Debug::INFO, "Message {$i}");
 }
 
 echo Log::getInternalLog();
