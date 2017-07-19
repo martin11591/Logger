@@ -1,0 +1,23 @@
+.pageOutside {
+  border: 2px solid black;
+  border-radius: 2px;
+  box-shadow: 0.3125em 0.3125em 0.625em 0.3125em #999999;
+  width: 66.14173em;
+  height: 93.54331em;
+  font-size: 12px; }
+
+.page {
+  box-sizing: border-box;
+  font-family: 'Times New Roman', serif;
+  font-size: 1em;
+  width: 100%;
+  height: 100%;
+  padding: 7.87402em; }
+
+.page * {
+  font-size: 1em; }
+
+.page img {
+  width: 50%;
+  display: block;
+  margin: auto; }

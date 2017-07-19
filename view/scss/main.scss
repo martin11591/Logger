@@ -1,0 +1,38 @@
+﻿$rootSize: 16px;
+$pageFontSize: 12px;
+
+@function scaleFont($targetSize: 10px, $baseSize: $rootSize) {
+  @return ($targetSize / $baseSize) + em;
+}
+
+.pageOutside {
+  border: 2px solid black;
+  border-radius: 2px;
+  box-shadow: scaleFont(5px) scaleFont(5px) scaleFont(10px) scaleFont(5px) #999999;
+  width: scaleFont(210mm, $pageFontSize);
+  height: scaleFont(297mm, $pageFontSize);
+  font-size: $pageFontSize;
+}
+
+.page {
+  box-sizing: border-box;
+  font-family: 'Times New Roman', serif;
+  font-size: 1em;
+  width: 100%;
+  height: 100%;
+
+  // inner margin
+  // normal - 2.5mm from all sides
+  // moderate - 2.54mm from top and bottom, 1.91mm from both sides
+  padding: scaleFont(2.5cm, $pageFontSize);
+}
+
+.page * {
+  font-size: 1em;
+}
+
+.page img {
+  width: 50%;
+  display: block;
+  margin: auto;
+}
